@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Crisis Supply Intelligence Dashboard</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #f8fafc;
+      color: #0f172a;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    #map {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #e2e8f0;
+      z-index: 1;
+    }
+
+    .leaflet-container {
+      width: 100%;
+      height: 100%;
+      background: #e2e8f0;
+    }
+
+    #sidebar {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 1000;
+      width: min(390px, calc(100vw - 32px));
+      max-height: calc(100vh - 32px);
+      display: flex;
+      flex-direction: column;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(15, 23, 42, .18);
+    }
+
+    .header {
+      padding: 18px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .eyebrow {
+      margin: 0;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #0891b2;
+    }
+
+    h1 {
+      margin: 5px 0 0;
+      font-size: 20px;
+      color: #0f172a;
+    }
+
+    .status {
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #fef3c7;
+      color: #b45309;
+      white-space: nowrap;
+    }
+
+    .status.live {
+      background: #dcfce7;
+      color: #15803d;
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, .12);
+    }
+
+    .status.offline {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+
+    .clock {
+      margin-top: 10px;
+      font-size: 11px;
+      color: #64748b;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .stat {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .stat-label {
+      font-size: 9px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #64748b;
+    }
+
+    .stat-value {
+      margin: 4px 0 0;
+      font-size: 24px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+
+    .content {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 18px;
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      color: #0f172a;
+    }
+
+    .source-note {
+      margin: -4px 0 10px;
+      font-size: 11px;
+      color: #64748b;
+    }
+
+    .alert {
+      width: 100%;
+      text-align: left;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 11px;
+      margin-bottom: 8px;
+      color: inherit;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    .alert:hover {
+      border-color: #f97316;
+      background: #fff7ed;
+    }
+
+    .alert-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #ea580c;
+    }
+
+    .alert-place {
+      margin-top: 5px;
+      font-size: 12px;
+      color: #334155;
+    }
+
+    .alert-time {
+      margin-top: 4px;
+      font-size: 10px;
+      color: #64748b;
+    }
+
+    .section {
+      margin-top: 22px;
+      padding-top: 18px;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    .filter {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 11px;
+      margin-bottom: 8px;
+      cursor: pointer;
+    }
+
+    .filter span {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .food { background: #22c55e; }
+    .water { background: #3b82f6; }
+    .medical { background: #ef4444; }
+    .fuel { background: #eab308; }
+
+    .refresh-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    button.refresh {
+      background: #0891b2;
+      border: none;
+      color: #ffffff;
+      border-radius: 8px;
+      padding: 9px 13px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button.refresh:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+
+    .error {
+      display: none;
+      margin-top: 12px;
+      padding: 10px;
+      border: 1px solid #fecaca;
+      background: #fef2f2;
+      color: #b91c1c;
+      border-radius: 10px;
+      font-size: 12px;
+    }
+
+    .error.visible { display: block; }
+
+    .footer {
+      padding: 10px 18px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 10px;
+      color: #64748b;
+    }
+
+    .supply-marker {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 3px solid #ffffff;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, .35);
+    }
+
+    .marker-food { background: #22c55e; }
+    .marker-water { background: #3b82f6; }
+    .marker-medical { background: #ef4444; }
+    .marker-fuel { background: #eab308; }
+    .marker-other { background: #a855f7; }
+
+    .alert-marker {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #f97316;
+      border: 3px solid #ffffff;
+      box-shadow: 0 2px 10px rgba(249, 115, 22, .6);
+    }
+
+    .alert-critical {
+      background: #dc2626;
+      box-shadow: 0 2px 10px rgba(220, 38, 38, .65);
+    }
+
+    .leaflet-popup-content-wrapper,
+    .leaflet-popup-tip {
+      background: #ffffff;
+      color: #0f172a;
+      border: 1px solid #cbd5e1;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <aside id="sidebar">
+    <div class="header">
+      <div class="header-row">
+        <div>
+          <p class="eyebrow">Crisis Operations</p>
+          <h1>Supply Intelligence</h1>
+        </div>
+        <div id="status" class="status">Connecting</div>
+      </div>
+
+      <div class="clock" id="clock">System time: —</div>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-label">Active nodes</div>
+          <p class="stat-value" id="nodeCount">—</p>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Live alerts</div>
+          <p class="stat-value" id="alertCount">—</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="content">
+      <h2>Live incident feed</h2>
+      <p class="source-note" id="alertSource">Initializing feed...</p>
+      <div id="alertFeed">
+        <div class="alert">Loading live alerts...</div>
+      </div>
+
+      <div class="section">
+        <h2>Supply layers</h2>
+
+        <label class="filter">
+          <span><i class="dot food"></i>Food / supermarkets</span>
+          <input type="checkbox" class="filter-toggle" data-category="food" checked />
+        </label>
+
+        <label class="filter">
+          <span><i class="dot water"></i>Water points</span>
+          <input type="checkbox" class="filter-toggle" data-category="water" checked />
+        </label>
+
+        <label class="filter">
+          <span><i class="dot medical"></i>Medical</span>
+          <input type="checkbox" class="filter-toggle" data-category="medical" checked />
+        </label>
+
+        <label class="filter">
+          <span><i class="dot fuel"></i>Fuel</span>
+          <input type="checkbox" class="filter-toggle" data-category="fuel" checked />
+        </label>
+      </div>
+
+      <div class="section">
+        <div class="refresh-row">
+          <div>
+            <h2>Operating area</h2>
+            <div style="font-size:12px;color:#64748b;">Bengaluru · 2 km radius</div>
+          </div>
+          <button class="refresh" id="refreshButton">Refresh</button>
+        </div>
+
+        <div class="error" id="errorMessage"></div>
+      </div>
+    </div>
+
+    <div class="footer">
+      Map data © OpenStreetMap contributors · Alerts: USGS or simulated fallback
+    </div>
+  </aside>
+
+  <script>
+    "use strict";
+
+    const API_BASE = "http://localhost:8000";
+    const LAT = 12.9716;
+    const LON = 77.5946;
+    const RADIUS = 2000;
+
+    const map = L.map("map").setView([LAT, LON], 13);
+
+    const tileLayer = L.tileLayer(
+      "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap contributors"
+      }
+    );
+
+    tileLayer.addTo(map);
+
+    tileLayer.on("tileerror", () => {
+      console.warn(
+        "A map tile failed to load. Check internet, VPN, firewall, proxy, or ad blocker."
+      );
+    });
+
+    function resizeMap() {
+      map.invalidateSize();
+    }
+
+    setTimeout(resizeMap, 100);
+    setTimeout(resizeMap, 500);
+    window.addEventListener("load", resizeMap);
+    window.addEventListener("resize", resizeMap);
+
+    setInterval(() => {
+      document.getElementById("clock").textContent =
+        "System time: " + new Date().toLocaleTimeString();
+    }, 1000);
+
+    const supplyLayer = L.layerGroup().addTo(map);
+    const alertLayer = L.layerGroup().addTo(map);
+
+    const supplyMarkers = [];
+    const alertMarkers = [];
+
+    const categoryState = {
+      food: true,
+      water: true,
+      medical: true,
+      fuel: true,
+      other: true
+    };
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function supplyIcon(category) {
+      const safe = categoryState[category] ? category : "other";
+
+      return L.divIcon({
+        className: "",
+        html: `<div class="supply-marker marker-${safe}"></div>`,
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
+        popupAnchor: [0, -13]
+      });
+    }
+
+    function alertIcon(priority) {
+      const className = priority === "critical"
+        ? "alert-marker alert-critical"
+        : "alert-marker";
+
+      return L.divIcon({
+        className: "",
+        html: `<div class="${className}"></div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+        popupAnchor: [0, -14]
+      });
+    }
+
+    function setStatus(state) {
+      const element = document.getElementById("status");
+      element.className = "status";
+
+      if (state === "live") {
+        element.textContent = "Live";
+        element.classList.add("live");
+      } else if (state === "offline") {
+        element.textContent = "Offline";
+        element.classList.add("offline");
+      } else {
+        element.textContent = "Connecting";
+      }
+    }
+
+    function showError(message) {
+      const element = document.getElementById("errorMessage");
+      element.textContent = message;
+      element.classList.add("visible");
+    }
+
+    function clearError() {
+      document.getElementById("errorMessage").classList.remove("visible");
+    }
+
+    async function fetchJson(url) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 180000);
+
+      try {
+        const response = await fetch(url, {
+          signal: controller.signal
+        });
+
+        if (!response.ok) {
+          let message = `HTTP ${response.status}`;
+
+          try {
+            const body = await response.json();
+
+            if (body && body.detail) {
+              message = body.detail;
+            }
+          } catch (_) {
+            // Keep HTTP status if response is not JSON.
+          }
+
+          throw new Error(message);
+        }
+
+        return await response.json();
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+
+    function formatTime(timestamp) {
+      if (!timestamp) return "Time unavailable";
+
+      try {
+        return new Date(timestamp).toLocaleString();
+      } catch (_) {
+        return "Time unavailable";
+      }
+    }
+
+    function renderSupplyNodes(data) {
+      supplyLayer.clearLayers();
+      supplyMarkers.length = 0;
+
+      const features = Array.isArray(data.features) ? data.features : [];
+
+      features.forEach((feature) => {
+        const properties = feature.properties || {};
+        const coords = feature.geometry?.coordinates || [];
+
+        if (coords.length < 2) return;
+
+        const lon = Number(coords[0]);
+        const lat = Number(coords[1]);
+        const category = properties.category || "other";
+
+        const marker = L.marker([lat, lon], {
+          icon: supplyIcon(category),
+          title: properties.name || properties.label || "Supply node"
+        });
+
+        marker.bindPopup(`
+          <div style="min-width:190px">
+            <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#0891b2">
+              ${escapeHtml(properties.label || category)}
+            </div>
+            <div style="margin-top:4px;font-size:15px;font-weight:700;color:#0f172a">
+              ${escapeHtml(properties.name || "Unnamed facility")}
+            </div>
+            <div style="margin-top:8px;font-size:11px;color:#64748b">
+              ${lat.toFixed(5)}, ${lon.toFixed(5)}
+            </div>
+          </div>
+        `);
+
+        marker.__category = category;
+        supplyMarkers.push(marker);
+
+        if (categoryState[category] !== false) {
+          marker.addTo(supplyLayer);
+        }
+      });
+
+      document.getElementById("nodeCount").textContent = features.length;
+      resizeMap();
+    }
+
+    function renderAlerts(data) {
+      alertLayer.clearLayers();
+      alertMarkers.length = 0;
+
+      const alerts = Array.isArray(data.alerts) ? data.alerts : [];
+      const feed = document.getElementById("alertFeed");
+      const sourceNote = document.getElementById("alertSource");
+
+      document.getElementById("alertCount").textContent = alerts.length;
+
+      if (data.live) {
+        sourceNote.textContent = `Live source: ${data.source}`;
+      } else {
+        sourceNote.textContent = `Operational simulation active — USGS unavailable${
+          data.usgs_error ? ` (${data.usgs_error})` : ""
+        }`;
+      }
+
+      if (!alerts.length) {
+        feed.innerHTML = `<div class="alert">No active alerts available.</div>`;
+        return;
+      }
+
+      feed.innerHTML = alerts.slice(0, 12).map((alert) => `
+        <button class="alert" data-lat="${alert.lat}" data-lon="${alert.lon}">
+          <div class="alert-top">
+            <span>${escapeHtml(alert.title || "Incident")}</span>
+            <span>${escapeHtml(String(alert.priority || "unknown").toUpperCase())}</span>
+          </div>
+          <div class="alert-place">${escapeHtml(alert.place)}</div>
+          <div class="alert-time">${escapeHtml(formatTime(alert.time))}</div>
+        </button>
+      `).join("");
+
+      alerts.forEach((alert) => {
+        const marker = L.marker([alert.lat, alert.lon], {
+          icon: alertIcon(alert.priority),
+          title: alert.title
+        });
+
+        marker.bindPopup(`
+          <div style="min-width:220px">
+            <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#ea580c">
+              ${escapeHtml(String(alert.priority).toUpperCase())} ALERT
+            </div>
+            <div style="margin-top:4px;font-size:15px;font-weight:700;color:#0f172a">
+              ${escapeHtml(alert.title || "Incident")}
+            </div>
+            <div style="margin-top:8px;font-size:12px;color:#334155">
+              ${escapeHtml(alert.place)}
+            </div>
+            <div style="margin-top:8px;font-size:11px;color:#64748b">
+              ${escapeHtml(formatTime(alert.time))} · ${escapeHtml(alert.source)}
+            </div>
+            ${
+              alert.url
+                ? `<a style="display:inline-block;margin-top:10px;color:#0891b2" href="${escapeHtml(alert.url)}" target="_blank" rel="noopener">Open source event</a>`
+                : ""
+            }
+          </div>
+        `);
+
+        marker.addTo(alertLayer);
+        alertMarkers.push(marker);
+      });
+
+      document.querySelectorAll(".alert").forEach((item) => {
+        item.addEventListener("click", () => {
+          const lat = Number(item.dataset.lat);
+          const lon = Number(item.dataset.lon);
+
+          map.setView([lat, lon], 9);
+
+          const marker = alertMarkers.find((candidate) => {
+            const position = candidate.getLatLng();
+
+            return (
+              Math.abs(position.lat - lat) < 0.00001 &&
+              Math.abs(position.lng - lon) < 0.00001
+            );
+          });
+
+          if (marker) marker.openPopup();
+        });
+      });
+
+      resizeMap();
+    }
+
+    function applyFilters() {
+      supplyMarkers.forEach((marker) => {
+        const visible = categoryState[marker.__category] !== false;
+
+        if (visible && !supplyLayer.hasLayer(marker)) {
+          marker.addTo(supplyLayer);
+        } else if (!visible && supplyLayer.hasLayer(marker)) {
+          supplyLayer.removeLayer(marker);
+        }
+
+        marker.setIcon(supplyIcon(marker.__category));
+      });
+    }
+
+    async function loadDashboard() {
+      clearError();
+      setStatus("connecting");
+
+      const button = document.getElementById("refreshButton");
+      button.disabled = true;
+      button.textContent = "Loading...";
+
+      const supplyPromise = fetchJson(
+        `${API_BASE}/api/supply-nodes?lat=${LAT}&lon=${LON}&radius=${RADIUS}`
+      )
+        .then((data) => {
+          renderSupplyNodes(data);
+          return true;
+        })
+        .catch((error) => {
+          console.error("Supply nodes failed:", error);
+          showError(`Supply-node data failed: ${error.message}`);
+          return false;
+        });
+
+      const alertPromise = fetchJson(`${API_BASE}/api/live-alerts`)
+        .then((data) => {
+          renderAlerts(data);
+          return true;
+        })
+        .catch((error) => {
+          console.error("Live alerts failed:", error);
+          showError(`Live alerts failed: ${error.message}`);
+          return false;
+        });
+
+      const [supplyOk, alertOk] = await Promise.all([
+        supplyPromise,
+        alertPromise
+      ]);
+
+      if (supplyOk || alertOk) {
+        setStatus("live");
+      } else {
+        setStatus("offline");
+      }
+
+      button.disabled = false;
+      button.textContent = "Refresh";
+      resizeMap();
+    }
+
+    document.querySelectorAll(".filter-toggle").forEach((toggle) => {
+      toggle.addEventListener("change", (event) => {
+        categoryState[event.target.dataset.category] = event.target.checked;
+        applyFilters();
+      });
+    });
+
+    document.getElementById("refreshButton").addEventListener(
+      "click",
+      loadDashboard
+    );
+
+    loadDashboard();
+    setInterval(loadDashboard, 60000);
+  </script>
+</body>
+</html>
